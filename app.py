@@ -10,7 +10,7 @@ from PIL import Image
 # =====================  PROJECT LINKS (sirf yahan badlein)  =====================
 APP_URL = "https://malaria-cell-detection-by-abdullah-sohail222.streamlit.app/"
 GITHUB_URL = "https://github.com/abdullahsohail99/malaria-cell-detection"
-PPT_URL = "https://docs.google.com/presentation/d/1Ax5xh3Ec7P2CmHJOFSsZb/edit?usp=sharing"
+PPT_URL = "https://docs.google.com/presentation/d/13W-JN3cPg9BupnFXJsGnwF9_dQk4NzO8/edit?usp=sharing"
 REPORT_URL = "https://docs.google.com/document/d/1yrGkvC2RCtqNjGZklubsDeO_BMYsIKqA/edit?usp=sharing"
 YOUTUBE_URL = ""   # YouTube link bana kar yahan paste karein, video page par khud embed ho jayegi
 LINKEDIN_URL = ""  # LinkedIn post ka link yahan paste karein
