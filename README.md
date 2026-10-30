@@ -5,7 +5,7 @@ Binary image classification of blood cell images: **Parasitized** vs **Uninfecte
 ## Project Links
 - **Live app:** https://malaria-cell-detection-by-abdullah-sohail222.streamlit.app/
 - **GitHub repository:** https://github.com/abdullahsohail99/malaria-cell-detection
-- **Presentation:** https://docs.google.com/presentation/d/1Ax5xh3Ec7P2CmHJOFSsZb/edit?usp=sharing
+- **Presentation:** https://docs.google.com/presentation/d/13W-JN3cPg9BupnFXJsGnwF9_dQk4NzO8/edit?usp=sharing
 - **Project report:** https://docs.google.com/document/d/1yrGkvC2RCtqNjGZklubsDeO_BMYsIKqA/edit?usp=sharing
 - **YouTube video:** (add link)
 - **LinkedIn post:** (add link)
