@@ -2,6 +2,7 @@
 import pandas as pd
 import streamlit as st
 
+import charts
 import db
 import ui
 
@@ -134,8 +135,18 @@ def account_view(user):
             p["day"] = pd.to_datetime(p["created_at"], utc=True).dt.tz_convert(tz).dt.tz_localize(None).dt.normalize()
             pv = p.pivot_table(index="day", columns="label", values="id", aggfunc="count", fill_value=0).sort_index()
             pv = pv.reindex(columns=["Parasitized", "Uninfected"], fill_value=0)
-            st.markdown("##### Predictions per day")
-            ui.bar_chart(pv, ["#eb6834", "#2a78d6"], 260)
+            today = pd.Timestamp.now(tz=tz).tz_localize(None).normalize()
+            pv = pv.reindex(pd.date_range(today - pd.Timedelta(days=13), today), fill_value=0)  # khali din bhi dikhao
+            l, r = st.columns([2, 1])
+            with l:
+                charts.chart("Predictions per day", [d.strftime("%d %b") for d in pv.index],
+                             [{"label": "Parasitized", "data": pv["Parasitized"].tolist(), "color": charts.ORANGE},
+                              {"label": "Uninfected", "data": pv["Uninfected"].tolist(), "color": charts.BLUE}],
+                             subtitle="Last 14 days, split by result", stacked=True, height=340)
+            with r:
+                charts.chart("Your results", ["Parasitized", "Uninfected"],
+                             [{"data": [para, n - para], "colors": [charts.ORANGE, charts.BLUE]}],
+                             kind="doughnut", subtitle="All your predictions", center_label="predictions", height=340)
         else:
             st.info("No predictions yet. Go to Home, run the demo, and your results will appear here.")
         st.caption(f"Member since {pd.to_datetime(user['created_at']).strftime('%d %b %Y')}. "
