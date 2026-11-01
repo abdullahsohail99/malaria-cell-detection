@@ -8,11 +8,17 @@ from importlib import metadata
 import pandas as pd
 import streamlit as st
 
+import charts
 import db
 import ui
 
 MODEL_PATH = "malaria_model.keras"
 CLASSES_PATH = "class_names.json"
+EPOCHS = ["1", "2", "3", "4", "5"]
+TRAIN_ACC = [0.8532, 0.9038, 0.9122, 0.9141, 0.9163]
+VAL_ACC = [0.9136, 0.9238, 0.9251, 0.9278, 0.9285]
+TRAIN_LOSS = [0.3331, 0.2427, 0.2277, 0.2212, 0.2180]
+VAL_LOSS = [0.2241, 0.2008, 0.1937, 0.1886, 0.1877]
 TZS = ["Asia/Karachi", "UTC", "Asia/Dubai", "Asia/Kolkata", "Asia/Singapore", "Europe/London", "America/New_York"]
 
 
@@ -67,34 +73,61 @@ def _overview(tz):
     low = int((preds["confidence"] < float(s["conf_warn"])).sum()) if n else 0
     guests = int(preds["user_id"].isna().sum()) if n else 0
 
-    a = st.columns(4)
-    a[0].metric("Total users", len(users))
-    a[1].metric("Active users", int((users["status"] == "active").sum()) if len(users) else 0)
-    a[2].metric("New in 7 days", new7)
-    a[3].metric("Admins", int((users["role"] == "admin").sum()) if len(users) else 0)
-    b = st.columns(4)
-    b[0].metric("Total predictions", n)
-    b[1].metric("Last 24 hours", last24)
-    b[2].metric("Parasitized share", f"{para:.1f}%")
-    b[3].metric("Avg confidence", f"{avg:.1f}%")
-    c = st.columns(2)
-    c[0].metric("Low-confidence results", low, help=f"Below {float(s['conf_warn']) * 100:.0f}%")
-    c[1].metric("Guest predictions", guests)
+    n_users = len(users)
+    active = int((users["status"] == "active").sum()) if n_users else 0
+    admins = int((users["role"] == "admin").sum()) if n_users else 0
+    ui.kpis([("users", "Total users", n_users, f"{active} active", "blue"),
+             ("user-plus", "New in 7 days", new7, "sign-ups", "green"),
+             ("shield", "Admins", admins, "", "violet"),
+             ("activity", "Total predictions", n, f"{last24} in last 24h", "orange")])
+    ui.kpis([("clock", "Last 24 hours", last24, "predictions", "teal"),
+             ("percent", "Parasitized share", f"{para:.1f}%", "of all results", "rose"),
+             ("target", "Avg confidence", f"{avg:.1f}%", "model certainty", "blue"),
+             ("alert", "Low confidence", low, f"below {float(s['conf_warn']) * 100:.0f}% | {guests} guest preds", "amber")])
 
-    l, r = st.columns(2)
-    with l:
-        st.markdown("##### Predictions per day (14 days)")
-        ui.bar_chart(_days_frame(preds, "created_at", tz, by="label"), ["#eb6834", "#2a78d6"], 280)
-    with r:
-        st.markdown("##### New sign-ups per day (14 days)")
-        ui.bar_chart(_days_frame(users, "created_at", tz), ["#2a78d6"], 280)
-    st.markdown("##### Confidence distribution")
-    if n:
-        bins = pd.cut(preds["confidence"] * 100, [50, 60, 70, 80, 90, 100], include_lowest=True,
-                      labels=["50-60", "60-70", "70-80", "80-90", "90-100"])
-        ui.bar_chart(bins.value_counts().sort_index().rename("Predictions").to_frame(), ["#2a78d6"], 260)
-    else:
-        st.info("No predictions recorded yet.")
+    days = _days_frame(preds, "created_at", tz, by="label")
+    day_labels = [d.strftime("%d %b") for d in days.index]
+    n_para = int((preds["label"] == "Parasitized").sum()) if n else 0
+
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        charts.chart("Predictions per day", day_labels,
+                     [{"label": "Parasitized", "data": days["Parasitized"].tolist(), "color": charts.ORANGE},
+                      {"label": "Uninfected", "data": days["Uninfected"].tolist(), "color": charts.BLUE}],
+                     subtitle="Last 14 days, split by result. Click a legend item to hide it.", stacked=True, height=360)
+    with c2:
+        charts.chart("Result mix", ["Parasitized", "Uninfected"],
+                     [{"data": [n_para, n - n_para], "colors": [charts.ORANGE, charts.BLUE]}],
+                     kind="doughnut", subtitle="All recorded predictions", center_label="predictions", height=360)
+
+    c3, c4 = st.columns(2)
+    with c3:
+        su = _days_frame(users, "created_at", tz)
+        charts.chart("New sign-ups", [d.strftime("%d %b") for d in su.index],
+                     [{"label": "Sign-ups", "data": su["Count"].tolist(), "color": charts.VIOLET}],
+                     subtitle="Last 14 days", height=320)
+    with c4:
+        if n:
+            bins = pd.cut(preds["confidence"] * 100, [50, 60, 70, 80, 90, 100], include_lowest=True,
+                          labels=["50-60", "60-70", "70-80", "80-90", "90-100"])
+            counts = bins.value_counts().sort_index().tolist()
+        else:
+            counts = [0] * 5
+        charts.chart("Confidence distribution", ["50-60%", "60-70%", "70-80%", "80-90%", "90-100%"],
+                     [{"label": "Predictions", "data": counts, "color": charts.NAVY}],
+                     subtitle="How sure the model is, per prediction", height=320)
+
+    c5, c6 = st.columns([2, 1])
+    with c5:
+        top = (preds[preds["user_id"].notna()].groupby("username").size().sort_values(ascending=False).head(6)
+               if n else pd.Series(dtype=int))
+        charts.chart("Most active users", top.index.tolist(),
+                     [{"label": "Predictions", "data": top.tolist(), "color": charts.VIOLET}],
+                     subtitle="Signed-in users, top 6", horizontal=True, height=320)
+    with c6:
+        charts.chart("Guests vs signed-in", ["Signed-in users", "Guests"],
+                     [{"data": [n - guests, guests], "colors": [charts.VIOLET, charts.AQUA]}],
+                     kind="doughnut", subtitle="Who uses the demo", center_label="predictions", height=320)
     st.markdown("##### Recent activity")
     st.dataframe(_local(db.audit_df(8), "ts", tz), hide_index=True)
 
@@ -193,11 +226,22 @@ def _predictions(me, tz):
 # ---------------------------------------------------------------- model
 def _model(tz):
     exists = os.path.exists(MODEL_PATH)
-    c = st.columns(4)
-    c[0].metric("Weights file", "Found" if exists else "Missing")
-    c[1].metric("File size", f"{os.path.getsize(MODEL_PATH) / 1e6:.1f} MB" if exists else "-")
-    c[2].metric("Validation accuracy", "92.85%")
-    c[3].metric("Input size", "128 x 128")
+    size = f"{os.path.getsize(MODEL_PATH) / 1e6:.1f} MB" if exists else "-"
+    ui.kpis([("file", "Weights file", "Found" if exists else "Missing", MODEL_PATH, "green" if exists else "rose"),
+             ("database", "File size", size, "", "blue"),
+             ("target", "Validation accuracy", "92.85%", "after 5 epochs", "violet"),
+             ("image", "Input size", "128 x 128", "RGB image", "orange")])
+    a1, a2 = st.columns(2)
+    with a1:
+        charts.chart("Accuracy per epoch", EPOCHS,
+                     [{"label": "Training", "data": TRAIN_ACC, "color": charts.BLUE},
+                      {"label": "Validation", "data": VAL_ACC, "color": charts.ORANGE}],
+                     kind="line", area=True, fmt="pct", y_min=0.84, y_max=0.94, subtitle="Training vs validation", height=320)
+    with a2:
+        charts.chart("Loss per epoch", EPOCHS,
+                     [{"label": "Training", "data": TRAIN_LOSS, "color": charts.BLUE},
+                      {"label": "Validation", "data": VAL_LOSS, "color": charts.ORANGE}],
+                     kind="line", area=True, fmt="dec", y_min=0.15, y_max=0.35, subtitle="Lower is better", height=320)
     l, r = st.columns(2)
     with l:
         st.markdown("##### Architecture and training")
@@ -206,10 +250,10 @@ def _model(tz):
                                          "Binary cross-entropy / Adam", "5 / 64", "Parasitized, Uninfected", MODEL_PATH]}).set_index("Setting"))
     with r:
         st.markdown("##### Training log")
-        st.table(pd.DataFrame({"Epoch": [1, 2, 3, 4, 5],
-                               "Train acc": ["85.32%", "90.38%", "91.22%", "91.41%", "91.63%"],
-                               "Val acc": ["91.36%", "92.38%", "92.51%", "92.78%", "92.85%"],
-                               "Val loss": [0.2241, 0.2008, 0.1937, 0.1886, 0.1877]}).set_index("Epoch"))
+        st.dataframe(pd.DataFrame({"Epoch": [1, 2, 3, 4, 5],
+                                   "Train acc": ["85.32%", "90.38%", "91.22%", "91.41%", "91.63%"],
+                                   "Val acc": ["91.36%", "92.38%", "92.51%", "92.78%", "92.85%"],
+                                   "Val loss": [0.2241, 0.2008, 0.1937, 0.1886, 0.1877]}), hide_index=True)
     st.markdown("##### Health check")
     st.caption("Loads the model and runs one prediction on a blank image to confirm everything works.")
     if st.button("Run health check", disabled=not exists):
@@ -273,11 +317,10 @@ def _audit(tz):
 # --------------------------------------------------------------- system
 def _system(me):
     counts = db.table_counts()
-    c = st.columns(4)
-    c[0].metric("Database size", f"{db.db_size() / 1024:.0f} KB")
-    c[1].metric("Users", counts["users"])
-    c[2].metric("Predictions", counts["predictions"])
-    c[3].metric("Audit entries", counts["audit"])
+    ui.kpis([("database", "Database size", f"{db.db_size() / 1024:.0f} KB", "", "teal"),
+             ("users", "Users", counts["users"], "", "blue"),
+             ("activity", "Predictions", counts["predictions"], "", "orange"),
+             ("list", "Audit entries", counts["audit"], "", "violet")])
 
     st.markdown("##### Security checklist")
     default_pw = db.default_admin_in_use()
@@ -330,12 +373,11 @@ def admin_view(me):
         st.error("Admins only.")
         return
     tz = db.get_setting("timezone")
-    ui.page_head("Administration", "Admin dashboard", "Monitor usage, manage users and control how the site behaves.")
+    ui.admin_hero(me["username"], tz)
     if db.default_admin_in_use():
         ui.banner("The built-in default admin password is still in use. Anyone who reads the public repository can sign in as admin. "
                   "Add ADMIN_USERNAME and ADMIN_PASSWORD to Streamlit secrets (see System tab), or change the password from Dashboard, Security.", "bad")
-    st.markdown(f'<span class="who">Signed in as <b>@{me["username"]}</b> (admin)</span>', unsafe_allow_html=True)
-    tabs = st.tabs(["Overview", "Users", "Predictions", "Model", "Settings", "Audit log", "System"])
+    tabs = st.tabs(["📊 Overview", "👥 Users", "🔬 Predictions", "🧠 Model", "⚙️ Settings", "📜 Audit log", "🛡️ System"])
     with tabs[0]:
         _overview(tz)
     with tabs[1]:
