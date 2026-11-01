@@ -1,5 +1,4 @@
 """Shared look-and-feel (DeepMind-inspired) and small HTML helpers."""
-import altair as alt
 import streamlit as st
 
 CSS = r"""
@@ -113,7 +112,9 @@ background:radial-gradient(circle at 30% 30%,#4285f4,transparent 60%),radial-gra
 .dm-links{margin-right:480px}
 .banner{border-radius:20px;padding:14px 22px;margin:0 0 18px;font-size:16px;font-weight:500}
 .banner.info{background:#e8f0fe;color:#174ea6}.banner.warn{background:#fef7e0;color:#8a5a00}.banner.bad{background:#fce8e6;color:#a50e0e}
-.page{padding-top:28px}
+.page{padding-top:6px}
+.block-container,[data-testid="stMainBlockContainer"]{padding-top:80px!important;padding-bottom:110px!important}
+.hero{padding-top:48px}
 .page h2{font-size:clamp(30px,4.4vw,48px);letter-spacing:-.035em;line-height:1.05;font-weight:500;margin:0 0 10px;padding:0}
 .stButton button,[data-testid="stFormSubmitButton"] button,[data-testid="stDownloadButton"] button{border-radius:999px;font-weight:600;padding:8px 22px}
 [data-testid="stFormSubmitButton"] button{width:100%}
@@ -132,6 +133,25 @@ background:radial-gradient(circle at 30% 30%,#4285f4,transparent 60%),radial-gra
 [data-testid="stExpander"]{border-radius:20px;border:1px solid var(--line)}
 .who{display:inline-flex;gap:10px;align-items:center;background:var(--card);border-radius:999px;padding:8px 16px;font-size:15px;font-weight:500;margin-bottom:14px}
 .ok{color:#137333;font-weight:600}.no{color:#c5221f;font-weight:600}
+/* ---------- colourful admin ---------- */
+.ahero{position:relative;overflow:hidden;border-radius:32px;padding:38px clamp(22px,4vw,48px);margin:6px 0 22px;color:#fff;
+background:radial-gradient(110% 150% at 0% 0%,#1d4ed8 0%,transparent 58%),radial-gradient(100% 150% at 100% 0%,#6d28d9 0%,transparent 55%),radial-gradient(110% 170% at 55% 130%,#be185d 0%,transparent 62%),#312e81}
+.ahero .eyebrow{color:rgba(255,255,255,.82);margin-bottom:10px}
+.ahero h2{color:#fff;font-size:clamp(32px,4.4vw,52px);letter-spacing:-.035em;font-weight:500;margin:0 0 8px;padding:0;line-height:1.05}
+.ahero p{color:rgba(255,255,255,.92);margin:0 0 20px;font-size:18px;line-height:1.45;max-width:640px}
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip2{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.34);border-radius:999px;padding:8px 16px;font-size:14px;font-weight:500;color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(var(--cols,4),1fr);gap:14px;margin:6px 0 20px}
+.kpi{display:flex;gap:16px;align-items:center;background:var(--bg);border-radius:24px;padding:20px 22px;min-width:0}
+.kpi .ic{width:48px;height:48px;border-radius:16px;background:#fff;color:var(--fg);display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.kpi .ic svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.kl{font-size:14px;color:#3c4043}
+.kpi .kv{display:block;border:0;padding:0;font-size:32px;line-height:1.1;letter-spacing:-.02em;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.ks{font-size:13px;color:var(--fg);font-weight:600;margin-top:3px}
+[data-baseweb="tab-highlight"]{background:linear-gradient(90deg,#4285f4,#9b72cb,#d96570)!important;height:3px!important;border-radius:3px}
+[data-baseweb="tab"][aria-selected="true"]{color:#1d4ed8!important}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.kpis{grid-template-columns:1fr}.ahero{border-radius:26px}}
 @media(max-width:1180px){.dm-links a.l{display:none}.dm-links{margin-right:0}}
 @media(max-width:700px){
 .st-key-topbar{top:74px;left:8px;right:8px;width:auto;background:#fff;padding:6px 0}
@@ -174,26 +194,46 @@ def page_head(eyebrow: str, title: str, sub: str = "", centered: bool = False):
     """), unsafe_allow_html=True)
 
 
-def bar_chart(df, colors, height=260):
-    """Bars in the exact row order of df (dates stay chronological, bins stay in order)."""
-    d = df.copy()
-    d.index = [x.strftime("%d %b") if hasattr(x, "strftime") else str(x) for x in d.index]
-    d.index.name = "x"
-    long = d.reset_index().melt("x", var_name="series", value_name="count")
-    multi = len(d.columns) > 1
-    chart = (
-        alt.Chart(long)
-        .mark_bar(size=18 if len(d) > 8 else 44, cornerRadiusTopLeft=0 if multi else 5, cornerRadiusTopRight=0 if multi else 5)
-        .encode(
-            x=alt.X("x:N", sort=list(d.index), title=None,
-                    axis=alt.Axis(labelAngle=0, labelOverlap=True, ticks=False, domain=False, labelColor="#5f6368")),
-            y=alt.Y("count:Q", title=None, axis=alt.Axis(tickMinStep=1, format="d", ticks=False, domain=False,
-                                                       gridColor="#e3e5e8", labelColor="#5f6368")),
-            color=alt.Color("series:N", scale=alt.Scale(domain=list(d.columns), range=colors),
-                            legend=alt.Legend(orient="bottom", title=None, labelColor="#5f6368") if multi else None),
-            tooltip=[alt.Tooltip("x:N", title="Day"), alt.Tooltip("series:N", title="Series"), alt.Tooltip("count:Q", title="Count")],
-        )
-        .properties(height=height)
-        .configure_view(strokeWidth=0)
-    )
-    st.altair_chart(chart)
+PALETTE = {  # (tint background, icon colour)
+    "blue": ("#e8f0fe", "#1a56c4"), "green": ("#e6f4ea", "#137333"), "violet": ("#f3e8fd", "#7e22ce"),
+    "rose": ("#fce8e6", "#c5221f"), "amber": ("#fef7e0", "#9a5b00"), "teal": ("#e0f7fa", "#00727c"),
+    "orange": ("#fff0e6", "#c2410c"),
+}
+_U = '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>'
+ICONS = {
+    "users": _U + '<path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    "user-check": _U + '<polyline points="16 11 18 13 22 9"/>',
+    "user-plus": _U + '<line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>',
+    "user": '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    "shield": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    "activity": '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+    "clock": '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    "percent": '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+    "target": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    "alert": '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    "database": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
+    "file": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+    "image": '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+    "list": '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+}
+
+
+def kpis(items, cols=4):
+    """Colourful stat cards. items: (icon, label, value, sub_text, colour_name)."""
+    cards = ""
+    for icon, label, value, sub, colour in items:
+        bg, fg = PALETTE[colour]
+        sub_html = f'<div class="ks">{sub}</div>' if sub else ""
+        cards += (f'<div class="kpi" style="--bg:{bg};--fg:{fg}"><div class="ic"><svg viewBox="0 0 24 24">{ICONS[icon]}</svg></div>'
+                  f'<div><div class="kl">{label}</div><div class="kv">{value}</div>{sub_html}</div></div>')
+    st.markdown(f'<div class="kpis" style="--cols:{cols}">{cards}</div>', unsafe_allow_html=True)
+
+
+def admin_hero(username: str, tz: str):
+    st.markdown(html(f"""
+    <div class="ahero"><div class="eyebrow">Administration</div>
+    <h2>Admin dashboard</h2>
+    <p>Monitor usage, manage users and control how the site behaves.</p>
+    <div class="chips"><span class="chip2">Signed in as @{username}</span><span class="chip2">Role: Admin</span><span class="chip2">Timezone: {tz}</span></div>
+    </div>
+    """), unsafe_allow_html=True)
